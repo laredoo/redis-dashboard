@@ -9,12 +9,6 @@ REDIS_HOST = os.environ['REDIS_HOST']
 REDIS_PORT = os.environ['REDIS_PORT']
 REDIS_INPUT_KEY = os.environ['REDIS_INPUT_KEY']
 
-config_redis = {
-    "timestamp": "2025-01-23 14:29:25.694864",
-    "percent-memory-caching": 68.9197342004972, 
-    "percent-network-egress": 32.298898723669225
-}
-
 st.set_page_config(page_title="Hamlet Dashboardh: Resource Monitoring", layout="wide")
 
 st.markdown("""
