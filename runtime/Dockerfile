@@ -5,7 +5,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
-COPY serverless_runtime.py /app/
+COPY runtime.py /app/
 
 RUN mkdir -p /opt
 
