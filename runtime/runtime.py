@@ -1,59 +1,137 @@
 import os
+import time
 import redis
 import json
 import logging
-import importlib.util
-import time
+import importlib
+import sys
 import zipfile
+import shutil
+import tempfile
 
-logger = logging.getLogger("Serverless Runtime")
-logger.setLevel(logging.DEBUG)
+class ServerlessRuntime:
+    def __init__(self):
+        self.redis_host = os.environ.get('REDIS_HOST', 'localhost')
+        self.redis_port = int(os.environ.get('REDIS_PORT', 6379))
+        self.redis_input_key = os.environ.get('REDIS_INPUT_KEY', 'metrics')
+        self.redis_output_key = os.environ.get('REDIS_OUTPUT_KEY', 'metrics_output')
+        
+        self.monitoring_period = int(os.environ.get('MONITORING_PERIOD', 5))
+        
+        self.function_path = os.environ.get('FUNCTION_PATH', '/opt/usermodule.py')
+        self.function_zip = os.environ.get('FUNCTION_ZIP')
+        self.function_handler = os.environ.get('FUNCTION_HANDLER', 'handler')
+        
+        logging.basicConfig(level=logging.INFO, 
+                            format='%(asctime)s - %(levelname)s - %(message)s')
+        self.logger = logging.getLogger(__name__)
+        
+        self.redis_client = redis.Redis(
+            host=self.redis_host, 
+            port=self.redis_port, 
+            decode_responses=True
+        )
 
-REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
-REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
-REDIS_INPUT_KEY = os.getenv('REDIS_INPUT_KEY', 'input')
-REDIS_OUTPUT_KEY = os.getenv('REDIS_OUTPUT_KEY', 'output')
-MONITORING_PERIOD = int(os.getenv('REDIS_MONITORING_PERIOD', 5))  # Default: 5 segundos
-FUNCTION_ENTRY = os.getenv('FUNCTION_ENTRY', 'handler')  # Default: função 'handler'
+    def _extract_zip_function(self):
+        """
+        Extract ZIP file containing function code if provided
+        """
+        if not self.function_zip:
+            return False
 
-redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT)
-
-def load_function():
-    user_function_path = "/opt/usermodule.py"
-    user_zip_path = "/opt/usermodule.zip"
-
-    if os.path.exists(user_zip_path):
-        logger.info("Unzipping function files...")
-        with zipfile.ZipFile(user_zip_path, 'r') as zip_ref:
-            zip_ref.extractall("/opt/function")
-        user_function_path = "/opt/function"
-
-    spec = importlib.util.spec_from_file_location("usermodule", user_function_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return getattr(module, FUNCTION_ENTRY)
-
-def monitor_redis_and_execute():
-    function = load_function()
-    last_data = None
-
-    while True:
         try:
-            raw_data = redis_client.get(REDIS_INPUT_KEY)
-            if raw_data != last_data:
-                last_data = raw_data
-                input_data = json.loads(raw_data)
-                context = {
-                    "env": dict(os.environ),
-                }
-                logger.info("Executing user function...")
-                result = function(input_data, context)
-                redis_client.set(REDIS_OUTPUT_KEY, json.dumps(result))
-                logger.info("Result saved to Redis.")
-        except Exception as e:
-            logger.error(f"Error: {e}")
-        time.sleep(MONITORING_PERIOD)
+            extract_dir = tempfile.mkdtemp()
+            
+            if self.function_zip.startswith('base64:'):
+                import base64
+                zip_content = base64.b64decode(self.function_zip[7:])
+                zip_path = os.path.join(extract_dir, 'function.zip')
+                
+                with open(zip_path, 'wb') as f:
+                    f.write(zip_content)
+            
+            elif self.function_zip.startswith(('http://', 'https://')):
+                import requests
+                response = requests.get(self.function_zip)
+                zip_path = os.path.join(extract_dir, 'function.zip')
+                
+                with open(zip_path, 'wb') as f:
+                    f.write(response.content)
+            
+            else:
+                self.logger.error("Invalid function_zip format")
+                return False
 
-if __name__ == "__main__":
-    logger.info("Starting Serverless Runtime...")
-    monitor_redis_and_execute()
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+            
+            sys.path.insert(0, extract_dir)
+            
+            return True
+        
+        except Exception as e:
+            self.logger.error(f"Error extracting ZIP: {e}")
+            return False
+
+    def _load_function(self):
+        """
+        Dynamically load the serverless function
+        """
+        try:
+            if self.function_zip:
+                if not self._extract_zip_function():
+                    raise ValueError("Failed to extract ZIP function")
+            
+            module_path = self.function_path
+            module_dir = os.path.dirname(module_path)
+            module_name = os.path.splitext(os.path.basename(module_path))[0]
+            
+            if module_dir not in sys.path:
+                sys.path.insert(0, module_dir)
+            
+            module = importlib.import_module(module_name)
+            
+            handler = getattr(module, self.function_handler)
+            
+            return handler
+        
+        except Exception as e:
+            self.logger.error(f"Error loading function: {e}")
+            raise
+
+    def run(self):
+        """
+        Main runtime execution method
+        """
+        try:
+            handler = self._load_function()
+            
+            self.logger.info(f"Serverless runtime started. Monitoring {self.redis_input_key}")
+            
+            while True:
+                try:
+                    input_data = self.redis_client.get(self.redis_input_key)
+                    
+                    if input_data:
+                        metrics_dict = json.loads(input_data)
+                        
+                        context = {}
+                        
+                        result = handler(metrics_dict, context)
+                        
+                        self.logger.info("Function executed successfully")
+                
+                except Exception as e:
+                    self.logger.error(f"Error in runtime loop: {e}")
+                
+                time.sleep(self.monitoring_period)
+        
+        except Exception as e:
+            self.logger.error(f"Critical error in runtime: {e}")
+
+def main():
+    runtime = ServerlessRuntime()
+    runtime.run()
+
+if __name__ == '__main__':
+    main()
