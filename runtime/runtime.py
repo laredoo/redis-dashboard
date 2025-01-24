@@ -8,6 +8,10 @@ import sys
 import zipfile
 import shutil
 import tempfile
+import logging
+
+logging.basicConfig(level=logging.DEBUG, 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 class ServerlessRuntime:
     def __init__(self):
@@ -42,28 +46,15 @@ class ServerlessRuntime:
         try:
             extract_dir = tempfile.mkdtemp()
             
-            if self.function_zip.startswith('base64:'):
-                import base64
-                zip_content = base64.b64decode(self.function_zip[7:])
-                zip_path = os.path.join(extract_dir, 'function.zip')
-                
-                with open(zip_path, 'wb') as f:
-                    f.write(zip_content)
-            
-            elif self.function_zip.startswith(('http://', 'https://')):
-                import requests
-                response = requests.get(self.function_zip)
-                zip_path = os.path.join(extract_dir, 'function.zip')
-                
-                with open(zip_path, 'wb') as f:
-                    f.write(response.content)
-            
-            else:
-                self.logger.error("Invalid function_zip format")
+            if not os.path.exists(self.function_zip):
+                self.logger.error(f"ZIP file not found: {self.function_zip}")
                 return False
-
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            
+            with zipfile.ZipFile(self.function_zip, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
+            
+            extracted_files = os.listdir(extract_dir)
+            self.logger.info(f"Extracted files: {extracted_files}")
             
             sys.path.insert(0, extract_dir)
             
@@ -71,6 +62,8 @@ class ServerlessRuntime:
         
         except Exception as e:
             self.logger.error(f"Error extracting ZIP: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
             return False
 
     def _load_function(self):
