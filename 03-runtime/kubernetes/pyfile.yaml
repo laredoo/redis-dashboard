@@ -1,0 +1,35 @@
+apiVersion: v1
+data:
+  pyfile: "from typing import Any, Dict\nimport redis\nimport json\nimport os\nimport
+    logging\n\nREDIS_HOST = os.environ['REDIS_HOST']\nREDIS_PORT = os.environ['REDIS_PORT']\nREDIS_INPUT_KEY
+    = os.environ['REDIS_INPUT_KEY']\nREDIS_OUTPUT_KEY = os.environ['REDIS_OUTPUT_KEY']\n\nlogger
+    = logging.getLogger(\"LOGGER START\")\nlogger.setLevel(logging.DEBUG)\n\nconn
+    = redis.Redis(host=REDIS_HOST, port=REDIS_PORT)\n\ndef calculate_network_info(info:
+    Dict[str, Any]) -> Dict[str, Any]:\n    network_info = {}\n\n    total_bytes_sent
+    = info['net_io_counters_eth0-bytes_sent']\n    total_bytes_recv = info['net_io_counters_eth0-bytes_recv']\n
+    \   total_traffic = total_bytes_sent + total_bytes_recv\n\n    network_info[\"percent-network-egress\"]
+    = (\n        (total_bytes_sent / total_traffic) * 100 if total_traffic > 0 else
+    0\n    )\n\n    return network_info\n\ndef calculate_memory_info(info: Dict[str,
+    Any]) -> Dict[str, Any]:\n    memory_info = {}\n\n    cached_memory = info['virtual_memory-cached']\n
+    \   buffer_memory = info['virtual_memory-buffers']\n    total_memory = info['virtual_memory-total']\n\n
+    \   memory_info[\"percent-memory-caching\"] = (\n        ((cached_memory + buffer_memory)
+    / total_memory) * 100\n    )\n\n    return memory_info\n\ndef calculate_metrics(\n
+    \       context: Dict[str, Any], \n        redis_info: Dict[str, Any]\n    ) ->
+    Dict[str, Any]:\n\n    metrics = {}\n    timestamp = redis_info[\"timestamp\"]\n
+    \   metrics['timestamp'] = timestamp\n\n    memory_info = calculate_memory_info(redis_info)\n
+    \   network_info = calculate_network_info(redis_info)\n\n    metrics = {\n        **metrics,
+    \n        **memory_info, \n        **network_info,\n    }\n\n    return metrics\n\ndef
+    handler(\n        input: Dict[str, Any], \n        context: Dict[str, Any]\n    )
+    -> Dict[str, Any]:\n    try:\n        if isinstance(input, str):\n            metrics_dict
+    = json.loads(input)\n        else:\n            metrics_dict = input\n        metrics
+    = calculate_metrics(context, metrics_dict)\n        conn.set(REDIS_OUTPUT_KEY,
+    json.dumps(metrics))\n        logger.info(\"Metrics successfully saved to Redis.\")\n
+    \   except Exception as e:\n        logger.error(f\"Error saving metrics to Redis:
+    {e}\")\n"
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2025-01-20T21:03:27Z"
+  name: pyfile
+  namespace: lucaslaredo
+  resourceVersion: "2479407"
+  uid: de020ec1-9d42-4cb1-aecb-24b2fa43b7a0
