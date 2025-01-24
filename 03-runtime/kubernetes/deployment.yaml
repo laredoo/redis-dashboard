@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lucaslaredo-serverless-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lucaslaredo-serverless-redis
+  template:
+    metadata:
+      labels:
+        app: lucaslaredo-serverless-redis
+    spec:
+      containers:
+      - name: lucaslaredo-serverless-redis
+        image: laredoo/serverless
+        imagePullPolicy: Always
+        resources:
+          requests:
+            cpu: 100m
+            memory: 300Mi
+        volumeMounts:
+        - name: function-zip
+          mountPath: "/opt/usermodule.zip"
+          readOnly: true
+        env:
+        - name: REDIS_HOST
+          value: "192.168.121.187"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_INPUT_KEY
+          value: "metrics"
+        - name: REDIS_OUTPUT_KEY
+          value: "lucaslaredo-proj3-output"
+        - name: MONITORING_PERIOD
+          value: "5"
+        - name: FUNCTION_ZIP
+          value: "/opt/usermodule.zip"
+        - name: FUNCTION_HANDLER
+          value: "handler"
+      volumes:
+      - name: function-zip
+        configMap:
+          name: function-zip
+          items:
+          - key: usermodule.zip
+            path: usermodule.zip

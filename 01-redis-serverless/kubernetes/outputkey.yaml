@@ -1,0 +1,10 @@
+apiVersion: v1
+data:
+  REDIS_OUTPUT_KEY: lucaslaredo-proj3-output
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2025-01-20T20:35:19Z"
+  name: outputkey
+  namespace: lucaslaredo
+  resourceVersion: "2471353"
+  uid: 25d3a3ce-a544-45c6-ac8f-4b88c70168a0

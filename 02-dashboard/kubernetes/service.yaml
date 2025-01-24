@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: laredoo-redis-dashboard
+  namespace: lucaslaredo
+spec:
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 51525                  
+      targetPort: 51525         
+      nodePort: 51525
+  selector:
+    app: laredoo-redis-dashboard
+

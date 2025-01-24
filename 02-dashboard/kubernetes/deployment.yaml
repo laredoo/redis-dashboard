@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: laredoo-redis-dashboard
+  namespace: lucaslaredo
+  labels:
+    app: laredoo-redis-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: laredoo-redis-dashboard
+  template:
+    metadata:
+      labels:
+        app: laredoo-redis-dashboard
+    spec:
+      containers:
+        - name: laredoo-redis-dashboard
+          image: laredoo/redis-dashboard
+          ports:
+            - containerPort: 51525
+          env:
+            - name: REDIS_HOST
+              value: "192.168.121.187" 
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_INPUT_KEY
+              value: "lucaslaredo-proj3-output"

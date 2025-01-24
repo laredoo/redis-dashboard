@@ -1,1 +1,65 @@
-.venv/*
+# Python
+*.pyc
+*.pyo
+__pycache__/
+*.pyd
+*.pdb
+*.log
+*.sqlite3
+*.db
+
+# Data Files
+*.pkl
+
+# Virtual environments
+*.env
+venv/
+env/
+.venv/
+ENV/
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# PyCharm
+*.iml
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Build directories
+build/
+dist/
+*.egg-info/
+
+# Docker
+.docker/
+
+# Coverage reports
+.coverage
+coverage.xml
+*.cover
+*.hypothesis/
+nosetests.xml
+
+# MyPy
+.mypy_cache/
+
+# pytest
+.cache/
+
+# Sphinx documentation
+docs/_build/
+
+# AWS Lambda
+.aws/
+
+# Dependency management
+Pipfile.lock

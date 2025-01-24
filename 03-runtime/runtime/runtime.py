@@ -68,29 +68,72 @@ class ServerlessRuntime:
 
     def _load_function(self):
         """
-        Dynamically load the serverless function
+        Dynamically load the serverless function from ZIP
         """
         try:
-            if self.function_zip:
-                if not self._extract_zip_function():
-                    raise ValueError("Failed to extract ZIP function")
+            # Extensive debugging information
+            import os
+            import stat
+
+            print(f"Function ZIP path: {self.function_zip}")
             
-            module_path = self.function_path
-            module_dir = os.path.dirname(module_path)
-            module_name = os.path.splitext(os.path.basename(module_path))[0]
+            # Check if path exists
+            if not os.path.exists(self.function_zip):
+                print(f"Path does not exist: {self.function_zip}")
+                raise ValueError(f"Path does not exist: {self.function_zip}")
             
-            if module_dir not in sys.path:
-                sys.path.insert(0, module_dir)
+            # Check file type and permissions
+            file_stat = os.stat(self.function_zip)
+            print(f"Path type: {'Directory' if stat.S_ISDIR(file_stat.st_mode) else 'File'}")
+            print(f"File permissions: {oct(file_stat.st_mode)}")
             
+            # If it's a directory, try to find the ZIP file inside
+            if os.path.isdir(self.function_zip):
+                zip_files = [f for f in os.listdir(self.function_zip) if f.endswith('.zip')]
+                if zip_files:
+                    self.function_zip = os.path.join(self.function_zip, zip_files[0])
+                    print(f"Found ZIP file in directory: {self.function_zip}")
+                else:
+                    raise ValueError("No ZIP file found in the directory")
+            
+            # Attempt to open as ZIP
+            with zipfile.ZipFile(self.function_zip, 'r') as zip_ref:
+                # Create a temporary directory
+                extract_dir = tempfile.mkdtemp()
+                
+                # List contents first for debugging
+                self.logger.info(f"ZIP contents: {zip_ref.namelist()}")
+                
+                # Extract all files
+                zip_ref.extractall(extract_dir)
+            
+            # List extracted files for debugging
+            extracted_files = os.listdir(extract_dir)
+            self.logger.info(f"Extracted files: {extracted_files}")
+            
+            # Add extracted directory to Python path
+            sys.path.insert(0, extract_dir)
+            
+            # Try to find a Python module
+            python_files = [f for f in extracted_files if f.endswith('.py')]
+            if not python_files:
+                raise ValueError("No Python files found in the ZIP")
+            
+            # Import the first Python file
+            module_name = os.path.splitext(python_files[0])[0]
             module = importlib.import_module(module_name)
             
+            # Get the handler function
             handler = getattr(module, self.function_handler)
             
             return handler
         
         except Exception as e:
-            self.logger.error(f"Error loading function: {e}")
+            self.logger.error(f"Error loading function from ZIP: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
             raise
+
 
     def run(self):
         """
