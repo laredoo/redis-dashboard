@@ -68,10 +68,20 @@ def format_date(timestamp):
     suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(day % 10 if day not in [11, 12, 13] else 0, 'th')
     return dt.strftime(f"%B {day}{suffix}, %Y")
 
-def update_config(metrics, percent_network_egress, percent_memory_cached):
+def update_config(
+        metrics, 
+        percent_network_egress, 
+        percent_memory_cached,
+        cpu_0,
+        cpu_1,
+        cpu_2
+    ):
     try:
         percent_network_egress.metric("Percent Network Egress", f"{metrics.get('percent-network-egress', 0):.2f}%")
         percent_memory_cached.metric("Percent Memory Cached", f"{metrics.get('percent-memory-caching', 0):.2f}%")
+        cpu_0.metric("Percent CPU-0 Usage", f"{metrics.get('avg-util-cpu0-60sec', 0):.2f}%")
+        cpu_1.metric("Percent CPU-1 Usage", f"{metrics.get('avg-util-cpu1-60sec', 0):.2f}%")
+        cpu_2.metric("Percent CPU-2 Usage", f"{metrics.get('avg-util-cpu2-60sec', 0):.2f}%")
 
     except Exception as e:
         st.error(f"Error fetching data: {e}")
@@ -124,8 +134,24 @@ def main():
     st.header("Memory Metrics")
     percent_memory_cached = st.metric("Percent Memory Cached", "0%")
 
+    st.header("CPU-0 Metrics")
+    cpu_0 = st.metric("Percent CPU-0 Usage", "0%")
+
+    st.header("CPU-1 Metrics")
+    cpu_1 = st.metric("Percent CPU-1 Usage", "0%")
+
+    st.header("CPU-2 Metrics")
+    cpu_2 = st.metric("Percent CPU-2 Usage", "0%")
+
     while True:
-        update_config(data, percent_network_egress, percent_memory_cached)
+        update_config(
+            data, 
+            percent_network_egress, 
+            percent_memory_cached,
+            cpu_0,
+            cpu_1,
+            cpu_2
+        )
         time.sleep(5)
 
 if __name__ == "__main__":
